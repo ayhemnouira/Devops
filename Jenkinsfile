@@ -2,15 +2,10 @@ pipeline {
     agent any
 
     stages {
-        stage('Clone') {
-            steps {
-                git 'https://github.com/ayhemnouira/Devops.git'
-            }
-        }
 
         stage('Test Backend') {
             steps {
-                dir('backend') {
+                dir('HeuresPlus') {
                     sh './mvnw test'
                 }
             }
@@ -18,7 +13,7 @@ pipeline {
 
         stage('Test Frontend') {
             steps {
-                dir('frontend') {
+                dir('heuresplusfrontend') {
                     sh 'npm install'
                     sh 'npm run test -- --watch=false --browsers=ChromeHeadless'
                 }
@@ -27,8 +22,8 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                sh 'docker build -t heuresplus-backend ./backend'
-                sh 'docker build -t heuresplus-frontend ./frontend'
+                sh 'docker build -t heuresplus-backend ./HeuresPlus'
+                sh 'docker build -t heuresplus-frontend ./heuresplusfrontend'
             }
         }
     }
