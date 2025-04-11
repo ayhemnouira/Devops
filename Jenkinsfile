@@ -1,7 +1,16 @@
 pipeline {
     agent any
 
+    tools {
+        jdk 'jdk21'
+    }
+
     stages {
+        stage('Vérifier Java') {
+            steps {
+                sh 'java -version'
+            }
+        }
 
         stage('Test Backend') {
             steps {
