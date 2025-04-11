@@ -1,36 +1,62 @@
 version: '3.8'
+
 services:
-  mysql:
-    image: mysql:8
-    container_name: mysql
-    restart: always
+  db:
+    image: mysql:8.0
+    container_name: heuresplus_db
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: heuresplus
+      MYSQL_ROOT_PASSWORD: Root2000
+      MYSQL_DATABASE: heuresPlusDB
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: admin123
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./sql-init:/docker-entrypoint-initdb.d  # Dossier contenant vos scripts SQL d'initialisation
     ports:
       - "3306:3306"
-    volumes:
-      - mysql-data:/var/lib/mysql
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
 
   backend:
-    build: ./backend
-    container_name: backend
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: heuresplus_backend
     depends_on:
-      - mysql
+      db:
+        condition: service_healthy
     ports:
       - "8080:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/heuresplus
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: root
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/heuresPlusDB?useSSL=false&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: admin123
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    networks:
+      - app-network
+    restart: unless-stopped
 
   frontend:
-    build: ./frontend
-    container_name: frontend
-    ports:
-      - "4200:80"
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: heuresplus_frontend
     depends_on:
       - backend
+    ports:
+      - "80:80"
+    networks:
+      - app-network
+    restart: unless-stopped
 
 volumes:
-  mysql-data:
+  db_data:
+
+networks:
+  app-network:
+    driver: bridge
