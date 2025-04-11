@@ -17,8 +17,5 @@ public class EmployeController {
     public List<Employe> getAllEmployes() {
         return employeService.getAllEmployes();
     }
-    @PostMapping
-    public Employe createEmploye(@RequestBody Employe employe) {
-        return employeService.saveEmploye(employe);
-    }
+
 }

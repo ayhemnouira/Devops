@@ -23,12 +23,6 @@ export class EmployeService {
       .pipe(catchError(this.handleError));
   }
 
-  addEmploye(employe: Employe): Observable<Employe> {
-    return this.http
-      .post<Employe>(this.apiUrl, employe, this.httpOptions)
-      .pipe(catchError(this.handleError));
-  }
-
   private handleError(error: any) {
     console.error('An error occurred:', error);
     return throwError(

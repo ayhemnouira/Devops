@@ -13,7 +13,5 @@ public class EmployeService {
     public List<Employe> getAllEmployes() {
         return employeRepository.findAll();
     }
-    public Employe saveEmploye(Employe employe) {
-        return employeRepository.save(employe);
-    }
+
 }

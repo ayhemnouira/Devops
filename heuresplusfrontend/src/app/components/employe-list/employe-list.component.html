@@ -1,41 +1,6 @@
 <div class="container mt-4">
   <h2>Liste des Employés</h2>
 
-  <!-- Form to Add New Employee -->
-  <form (ngSubmit)="addEmploye()">
-    <div class="mb-3">
-      <input
-        type="text"
-        [(ngModel)]="newEmploye.nom"
-        name="nom"
-        placeholder="Nom"
-        required
-        class="form-control"
-      />
-    </div>
-    <div class="mb-3">
-      <input
-        type="text"
-        [(ngModel)]="newEmploye.prenom"
-        name="prenom"
-        placeholder="Prénom"
-        required
-        class="form-control"
-      />
-    </div>
-    <div class="mb-3">
-      <input
-        type="text"
-        [(ngModel)]="newEmploye.poste"
-        name="poste"
-        placeholder="Poste"
-        required
-        class="form-control"
-      />
-    </div>
-    <button type="submit" class="btn btn-primary">Ajouter Employé</button>
-  </form>
-
   <!-- Table to Display Employees -->
   <table class="table table-bordered mt-4">
     <thead>

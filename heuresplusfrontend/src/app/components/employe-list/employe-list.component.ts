@@ -13,7 +13,6 @@ import { CommonModule } from '@angular/common';
 })
 export class EmployeListComponent implements OnInit {
   employes: Employe[] = [];
-  newEmploye: Employe = { nom: '', prenom: '', poste: '' };
 
   constructor(private employeService: EmployeService) {}
 
@@ -28,18 +27,6 @@ export class EmployeListComponent implements OnInit {
       },
       error: (err) => {
         console.error('Error fetching employees:', err);
-      },
-    });
-  }
-
-  addEmploye(): void {
-    this.employeService.addEmploye(this.newEmploye).subscribe({
-      next: (employe) => {
-        this.employes.push(employe);
-        this.newEmploye = { nom: '', prenom: '', poste: '' }; // Reset the form
-      },
-      error: (err) => {
-        console.error('Error adding employee:', err);
       },
     });
   }
