@@ -1,38 +1,23 @@
 pipeline {
     agent any
 
-    options {
-        skipDefaultCheckout()
+    parameters {
+        choice(name: 'ENVIRONMENT', choices: ['staging', 'production'], description: 'Choisir l\'environnement de déploiement')
     }
 
     environment {
-        DB_URL = 'jdbc:mysql://db:3306/heuresPlusDB'
-        VERSION = "${env.BUILD_ID}"
-        DOCKERHUB_USER = 'ayhemnr' // Ton nom DockerHub
+        MYSQL_ROOT_PASSWORD = 'Root2000'
+        MYSQL_USER = 'admin'
+        MYSQL_PASSWORD = 'admin123'
+        DB_PORT = '3306'
+        BACKEND_PORT = '8080'
+        FRONTEND_PORT = '80'
     }
 
     stages {
         stage('Checkout') {
             steps {
-                checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: '*/main']],
-                    extensions: [],
-                    userRemoteConfigs: [[
-                        url: 'https://github.com/ayhemnouira/Devops.git',
-                        credentialsId: 'github-credentials'
-                    ]]
-                ])
-                script {
-                    // Fixe manuellement la branche active
-                    env.BRANCH_NAME = sh(script: "git rev-parse --abbrev-ref HEAD", returnStdout: true).trim()
-                }
-            }
-        }
-
-        stage('Debug') {
-            steps {
-                echo "✅ Branche détectée : ${env.BRANCH_NAME}"
+                checkout scm
             }
         }
 
@@ -41,15 +26,6 @@ pipeline {
                 dir('HeuresPlus') {
                     sh 'mvn clean package -DskipTests'
                     archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
-                }
-            }
-        }
-
-        stage('Test Backend') {
-            steps {
-                dir('HeuresPlus') {
-                    sh 'mvn test'
-                    junit 'target/surefire-reports/**/*.xml'
                 }
             }
         }
@@ -80,72 +56,27 @@ pipeline {
             }
         }
 
-        stage('Deploy to Staging') {
-            when {
-                expression { env.BRANCH_NAME == 'main' }
-            }
+        stage('Deploy to Server') {
             steps {
-                sshPublisher(
-                    publishers: [
-                        sshPublisherDesc(
-                            configName: 'staging-server',
-                            transfers: [
-                                sshTransfer(
-                                    execCommand: """
-                                        docker pull ${env.DOCKERHUB_USER}/heuresplus-backend:${env.VERSION}
-                                        docker pull ${env.DOCKERHUB_USER}/heuresplus-frontend:${env.VERSION}
-                                        docker-compose -f docker-compose.staging.yml down
-                                        docker-compose -f docker-compose.staging.yml up -d
-                                    """,
-                                    verbose: true
-                                )
-                            ],
-                            usePromotionTimestamp: false
-                        )
-                    ]
-                )
-            }
-        }
+                script {
+                    def environmentName = params.ENVIRONMENT
 
-        stage('Approval Production') {
-            when {
-                expression { env.BRANCH_NAME == 'main' }
-            }
-            steps {
-                timeout(time: 15, unit: 'MINUTES') {
-                    input(
-                        message: 'Approuver le déploiement en production ?', 
-                        ok: 'Déployer',
-                        submitter: 'admin,ayhem'
-                    )
+                    // Définir les variables spécifiques à l'environnement
+                    if (environmentName == 'staging') {
+                        env.MYSQL_PASSWORD = 'staging_password'
+                        env.DB_PORT = '3307'
+                        env.BACKEND_PORT = '8081'
+                        env.FRONTEND_PORT = '8082'
+                    } else if (environmentName == 'production') {
+                        env.MYSQL_PASSWORD = 'production_password'
+                        env.DB_PORT = '3306'
+                        env.BACKEND_PORT = '8080'
+                        env.FRONTEND_PORT = '80'
+                    }
+
+                    // Déployer avec le fichier docker-compose.yml
+                    sh "docker-compose up -d"
                 }
-            }
-        }
-
-        stage('Deploy to Production') {
-            when {
-                expression { env.BRANCH_NAME == 'main' }
-            }
-            steps {
-                sshPublisher(
-                    publishers: [
-                        sshPublisherDesc(
-                            configName: 'production-server',
-                            transfers: [
-                                sshTransfer(
-                                    execCommand: """
-                                        docker pull ${env.DOCKERHUB_USER}/heuresplus-backend:${env.VERSION}
-                                        docker pull ${env.DOCKERHUB_USER}/heuresplus-frontend:${env.VERSION}
-                                        docker-compose -f docker-compose.prod.yml down
-                                        docker-compose -f docker-compose.prod.yml up -d
-                                    """,
-                                    verbose: true
-                                )
-                            ],
-                            usePromotionTimestamp: false
-                        )
-                    ]
-                )
             }
         }
     }
