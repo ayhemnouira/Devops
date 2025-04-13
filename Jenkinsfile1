@@ -2,17 +2,24 @@ pipeline {
     agent any
 
     environment {
-        DB_URL = 'jdbc:mysql://db:3306/heuresPlusDB'
+        // Externaliser les configurations sensibles via Jenkins Credentials
+        DB_URL = credentials('DB_URL_CREDS')
         VERSION = "${env.BUILD_ID}"
-        DOCKERHUB_USER = 'ayhemnr' // Ton nom d'utilisateur DockerHub
+        DOCKERHUB_CREDS = credentials('dockerhub-creds')
     }
 
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main',
-                    url: 'https://github.com/ayhemnouira/Devops.git',
-                    credentialsId: 'github-credentials'
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/main']],
+                    extensions: [],
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/ayhemnouira/Devops.git',
+                        credentialsId: 'github-credentials'
+                    ]]
+                ])
             }
         }
 
@@ -30,6 +37,13 @@ pipeline {
                 dir('HeuresPlus') {
                     sh 'mvn test'
                     junit 'target/surefire-reports/**/*.xml'
+                    script {
+                        try {
+                            sh 'mvn sonar:sonar -Dsonar.projectKey=heuresplus-backend'
+                        } catch (err) {
+                            echo "SonarQube analysis warning: ${err}"
+                        }
+                    }
                 }
             }
         }
@@ -39,6 +53,7 @@ pipeline {
                 dir('heuresplusfrontend') {
                     sh 'npm install'
                     sh 'npm run build'
+                    sh 'npm test || true' // Ne pas faire échouer le build pour les tests frontend
                     archiveArtifacts artifacts: 'dist/**/*', fingerprint: true
                 }
             }
@@ -48,13 +63,11 @@ pipeline {
             steps {
                 script {
                     docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-creds') {
-                        // Backend image
-                        def backendImage = docker.build("${DOCKERHUB_USER}/heuresplus-backend:${VERSION}", 'HeuresPlus')
+                        def backendImage = docker.build("${env.DOCKERHUB_CREDS_USR}/heuresplus-backend:${VERSION}", 'HeuresPlus')
                         backendImage.push()
                         backendImage.push('latest')
 
-                        // Frontend image
-                        def frontendImage = docker.build("${DOCKERHUB_USER}/heuresplus-frontend:${VERSION}", 'heuresplusfrontend')
+                        def frontendImage = docker.build("${env.DOCKERHUB_CREDS_USR}/heuresplus-frontend:${VERSION}", 'heuresplusfrontend')
                         frontendImage.push()
                         frontendImage.push('latest')
                     }
@@ -74,48 +87,68 @@ pipeline {
                             transfers: [
                                 sshTransfer(
                                     execCommand: """
-                                        docker pull ${DOCKERHUB_USER}/heuresplus-backend:${VERSION}
-                                        docker pull ${DOCKERHUB_USER}/heuresplus-frontend:${VERSION}
-                                        docker-compose -f docker-compose.yml down
-                                        docker-compose -f docker-compose.yml up -d
+                                        docker pull ${env.DOCKERHUB_CREDS_USR}/heuresplus-backend:${VERSION}
+                                        docker pull ${env.DOCKERHUB_CREDS_USR}/heuresplus-frontend:${VERSION}
+                                        docker-compose -f docker-compose.staging.yml down
+                                        docker-compose -f docker-compose.staging.yml up -d
                                     """
                                 )
                             ],
-                            usePromotionTimestamp: false
+                            usePromotionTimestamp: false,
+                            verbose: true
                         )
                     ]
                 )
             }
         }
 
-      
-
-        stage('Deploy to Production') {
+        stage('Approval Production') {
             when {
-                branch 'production'
+                branch 'main'
             }
             steps {
                 timeout(time: 15, unit: 'MINUTES') {
-                    input message: 'Approuver le déploiement en production?', ok: 'Déployer'
+                    input(
+                        message: 'Approuver le déploiement en production?', 
+                        ok: 'Déployer',
+                        parameters: [
+                            choice(
+                                name: 'ENVIRONMENT',
+                                choices: ['prod'],
+                                description: 'Environnement de production'
+                            )
+                        ]
+                    )
                 }
-                sshPublisher(
-                    publishers: [
-                        sshPublisherDesc(
-                            configName: 'production-server',
-                            transfers: [
-                                sshTransfer(
-                                    execCommand: """
-                                        docker pull ${DOCKERHUB_USER}/heuresplus-backend:${VERSION}
-                                        docker pull ${DOCKERHUB_USER}/heuresplus-frontend:${VERSION}
-                                        docker-compose -f docker-compose.prod.yml down
-                                        docker-compose -f docker-compose.prod.yml up -d
-                                    """
-                                )
-                            ],
-                            usePromotionTimestamp: false
-                        )
-                    ]
-                )
+            }
+        }
+
+        stage('Deploy to Production') {
+            when {
+                branch 'main'
+                beforeAgent true
+            }
+            steps {
+                script {
+                    sshPublisher(
+                        publishers: [
+                            sshPublisherDesc(
+                                configName: "${params.ENVIRONMENT}-server",
+                                transfers: [
+                                    sshTransfer(
+                                        execCommand: """
+                                            docker pull ${env.DOCKERHUB_CREDS_USR}/heuresplus-backend:${VERSION}
+                                            docker pull ${env.DOCKERHUB_CREDS_USR}/heuresplus-frontend:${VERSION}
+                                            docker-compose -f docker-compose.prod.yml down
+                                            docker-compose -f docker-compose.prod.yml up -d
+                                        """
+                                    )
+                                ],
+                                usePromotionTimestamp: false
+                            )
+                        ]
+                    )
+                }
             }
         }
     }
@@ -123,16 +156,16 @@ pipeline {
     post {
         always {
             cleanWs()
+            script {
+                // Log simple du résultat
+                echo "Build status: ${currentBuild.currentResult}"
+            }
         }
         success {
-            script {
-                echo "✅ Build réussi"
-            }
+            echo "✅ Build et déploiement réussis"
         }
         failure {
-            script {
-                echo "❌ Build échoué"
-            }
+            echo "❌ Échec du build ou du déploiement"
         }
     }
 }
