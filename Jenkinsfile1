@@ -5,6 +5,7 @@ pipeline {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
         DB_URL = 'jdbc:mysql://db:3306/heuresPlusDB'
         VERSION = "${env.BUILD_ID}"
+        DOCKERHUB_USER = 'ayhemnr' // Ton nom d'utilisateur DockerHub
     }
 
     stages {
@@ -47,14 +48,16 @@ pipeline {
         stage('Build Docker Images') {
             steps {
                 script {
-                    docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-creds') {
+                    docker.withRegistry('https://registry.hub.docker.com', DOCKERHUB_CREDENTIALS) {
                         // Backend image
-                        docker.build("ayhem/heuresplus-backend:${VERSION}", './HeuresPlus').push()
-                        docker.image("ayhem/heuresplus-backend:${VERSION}").push('latest')
+                        def backendImage = docker.build("${DOCKERHUB_USER}/heuresplus-backend:${VERSION}", './HeuresPlus')
+                        backendImage.push()
+                        backendImage.push('latest')
 
                         // Frontend image
-                        docker.build("ayhem/heuresplus-frontend:${VERSION}", './heuresplusfrontend').push()
-                        docker.image("ayhem/heuresplus-frontend:${VERSION}").push('latest')
+                        def frontendImage = docker.build("${DOCKERHUB_USER}/heuresplus-frontend:${VERSION}", './heuresplusfrontend')
+                        frontendImage.push()
+                        frontendImage.push('latest')
                     }
                 }
             }
@@ -72,8 +75,8 @@ pipeline {
                             transfers: [
                                 sshTransfer(
                                     execCommand: """
-                                    docker pull ayhem/heuresplus-backend:${VERSION}
-                                    docker pull ayhem/heuresplus-frontend:${VERSION}
+                                    docker pull ${DOCKERHUB_USER}/heuresplus-backend:${VERSION}
+                                    docker pull ${DOCKERHUB_USER}/heuresplus-frontend:${VERSION}
                                     docker-compose -f docker-compose.yml down
                                     docker-compose -f docker-compose.yml up -d
                                     """
@@ -110,8 +113,8 @@ pipeline {
                             transfers: [
                                 sshTransfer(
                                     execCommand: """
-                                    docker pull ayhem/heuresplus-backend:${VERSION}
-                                    docker pull ayhem/heuresplus-frontend:${VERSION}
+                                    docker pull ${DOCKERHUB_USER}/heuresplus-backend:${VERSION}
+                                    docker pull ${DOCKERHUB_USER}/heuresplus-frontend:${VERSION}
                                     docker-compose -f docker-compose.prod.yml down
                                     docker-compose -f docker-compose.prod.yml up -d
                                     """
@@ -132,13 +135,11 @@ pipeline {
         success {
             script {
                 echo "Build réussi - Slack désactivé ou plugin non installé"
-                // slackSend(...) ligne désactivée pour éviter l'erreur
             }
         }
         failure {
             script {
                 echo "Build échoué - Slack désactivé ou plugin non installé"
-                // slackSend(...) ligne désactivée pour éviter l'erreur
             }
         }
     }
