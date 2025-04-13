@@ -2,11 +2,10 @@ pipeline {
     agent any
 
     environment {
-        // Utilisation d'une URL de DB par défaut si le credential n'existe pas
-        DB_URL = credentials('DB_URL_CREDS', [usernameVariable: 'DB_URL'])
+        // Version corrigée pour les credentials
+        DB_URL = credentials('DB_URL_CREDS') // Simple référence au credential
         VERSION = "${env.BUILD_ID}"
-        // Utilisation directe du credential DockerHub configuré dans Jenkins
-        DOCKERHUB_USER = credentials('dockerhub-creds').username
+        DOCKERHUB_CREDS = credentials('dockerhub-creds') // Stocke l'ensemble du credential
     }
 
     stages {
@@ -55,11 +54,12 @@ pipeline {
         stage('Build Docker Images') {
             steps {
                 script {
+                    // Utilisation correcte des credentials Docker
                     docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-creds') {
-                        def backendImage = docker.build("${DOCKERHUB_USER}/heuresplus-backend:${VERSION}", 'HeuresPlus')
+                        def backendImage = docker.build("${env.DOCKERHUB_CREDS_USR}/heuresplus-backend:${VERSION}", 'HeuresPlus')
                         backendImage.push()
                         
-                        def frontendImage = docker.build("${DOCKERHUB_USER}/heuresplus-frontend:${VERSION}", 'heuresplusfrontend')
+                        def frontendImage = docker.build("${env.DOCKERHUB_CREDS_USR}/heuresplus-frontend:${VERSION}", 'heuresplusfrontend')
                         frontendImage.push()
                     }
                 }
@@ -70,10 +70,7 @@ pipeline {
     post {
         always {
             script {
-                // Nettoyage seulement si on est dans un contexte node
-                if (env.NODE_NAME != null) {
-                    cleanWs()
-                }
+                cleanWs()
                 echo "Build status: ${currentBuild.currentResult}"
             }
         }
@@ -82,7 +79,6 @@ pipeline {
         }
         failure {
             echo "❌ Échec du build"
-            // Ajouter ici des actions de notification si nécessaire
         }
     }
 }
