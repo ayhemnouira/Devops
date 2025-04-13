@@ -109,7 +109,7 @@ pipeline {
 
         stage('Approval Production') {
             when {
-                expression { env.BRANCH_NAME == 'main' }
+                expression { env.BRANCH_NAME == '*/main' }
             }
             steps {
                 timeout(time: 15, unit: 'MINUTES') {
@@ -124,7 +124,7 @@ pipeline {
 
         stage('Deploy to Production') {
             when {
-                expression { env.BRANCH_NAME == 'main' }
+                expression { env.BRANCH_NAME == '*/main' }
             }
             steps {
                 sshPublisher(
