@@ -5,15 +5,15 @@ services:
     image: mysql:8.0
     container_name: heuresplus_db
     environment:
-      MYSQL_ROOT_PASSWORD: Root2000
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-Root2000}
       MYSQL_DATABASE: heuresPlusDB
-      MYSQL_USER: admin
-      MYSQL_PASSWORD: admin123
+      MYSQL_USER: ${MYSQL_USER:-admin}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-admin123}
     volumes:
       - db_data:/var/lib/mysql
-      - ./sql-init:/docker-entrypoint-initdb.d  # Dossier contenant vos scripts SQL d'initialisation
+      - ./sql-init:/docker-entrypoint-initdb.d
     ports:
-      - "3306:3306"
+      - "${DB_PORT:-3306}:3306"
     networks:
       - app-network
     healthcheck:
@@ -23,19 +23,19 @@ services:
       retries: 10
 
   backend:
-    build: 
-      context: ./HeuresPlus        # Si le dossier backend s'appelle HeuresPlus
+    build:
+      context: ./HeuresPlus
       dockerfile: Dockerfile
     container_name: heuresplus_backend
     depends_on:
       db:
         condition: service_healthy
     ports:
-      - "8080:8080"
+      - "${BACKEND_PORT:-8080}:8080"
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/heuresPlusDB?useSSL=false&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
-      SPRING_DATASOURCE_USERNAME: admin
-      SPRING_DATASOURCE_PASSWORD: admin123
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-admin}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-admin123}
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
     networks:
       - app-network
@@ -43,13 +43,13 @@ services:
 
   frontend:
     build:
-      context: ./heuresplusfrontend   # Si le dossier frontend s'appelle heuresplusfrontend
+      context: ./heuresplusfrontend
       dockerfile: Dockerfile
     container_name: heuresplus_frontend
     depends_on:
       - backend
     ports:
-      - "80:80"
+      - "${FRONTEND_PORT:-80}:80"
     networks:
       - app-network
     restart: unless-stopped
