@@ -24,7 +24,7 @@ services:
 
   backend:
     build: 
-      context: ./backend
+      context: ./HeuresPlus        # Si le dossier backend s'appelle HeuresPlus
       dockerfile: Dockerfile
     container_name: heuresplus_backend
     depends_on:
@@ -43,7 +43,7 @@ services:
 
   frontend:
     build:
-      context: ./frontend
+      context: ./heuresplusfrontend   # Si le dossier frontend s'appelle heuresplusfrontend
       dockerfile: Dockerfile
     container_name: heuresplus_frontend
     depends_on:
