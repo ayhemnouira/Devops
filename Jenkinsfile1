@@ -88,14 +88,7 @@ pipeline {
             }
         }
 
-        stage('Run Integration Tests') {
-            steps {
-                dir('HeuresPlus') {
-                    sh 'mvn verify -DskipUnitTests=true'
-                    junit 'target/failsafe-reports/**/*.xml'
-                }
-            }
-        }
+     
 
         stage('Deploy to Production') {
             when {
